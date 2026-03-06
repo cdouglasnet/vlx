@@ -29,10 +29,6 @@ An [Alfred](https://www.alfredapp.com/) workflow for fast access to the [Visualo
 |----------------|----------------------------------|--------------------------------------------------|
 | `API_KEY`      | *(required)*                     | Your VLX API key                                 |
 | `key`          | `vlx`                            | Alfred keyword to trigger the workflow           |
-| `actionPrefix` | `→`                              | Prefix shown on action menu items                |
-| `goBack`       | `← Go Back`                      | Label for the "Go Back" menu item                |
-| `host`         | `https://app.visualogyx.com/`    | VLX web app base URL                             |
-| `api_ref`      | `https://developer.vlx.ai/...`   | VLX API documentation URL                        |
 | `team`         | `Admin`                          | Team name                                        |
 | `team_id`      | `8ea84391-dbb3-4d97-a35b-...`    | Team ID                                          |
 
