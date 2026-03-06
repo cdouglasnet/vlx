@@ -1,0 +1,60 @@
+name: PR Build Check
+
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Get version from info.plist
+      id: version
+      run: |
+        VERSION=$(plutil -extract version raw info.plist)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Workflow version: $VERSION"
+
+    - name: Build workflow
+      run: |
+        chmod +x build.sh
+        ./build.sh
+
+    - name: Verify build
+      run: |
+        test -f VLX.alfredworkflow || exit 1
+        unzip -t VLX.alfredworkflow
+        echo "✅ Workflow built successfully"
+
+    - name: Upload workflow artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VLX-PR-${{ github.event.pull_request.number }}.alfredworkflow
+        path: VLX.alfredworkflow
+        retention-days: 7
+
+    - name: Comment on PR
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '✅ **Build Successful!**\n\nThe Alfred workflow has been built successfully. You can download the artifact from the [Actions tab](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).'
+          })
+

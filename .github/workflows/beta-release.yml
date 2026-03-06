@@ -1,0 +1,121 @@
+name: Beta Release
+
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        prerelease: true
+        draft: false
+        files: VLX.alfredworkflow
+        body: ${{ steps.changelog.outputs.changelog }}
+        name: "🚧 Beta Release v${{ steps.version.outputs.PLIST_VERSION }}"
+        tag_name: ${{ steps.version.outputs.RELEASE_TAG }}
+      with:
+      uses: softprops/action-gh-release@v1
+    - name: Create beta release
+        
+        echo "EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        CHANGELOG=$(cat CHANGELOG.md)
+        
+        EOF
+        [View all changes](https://github.com/${{ github.repository }}/compare/$LATEST_PROD_TAG..HEAD)
+        
+        $COMMITS
+        ### What's New
+        
+        **⚠️ This is a beta release for testing purposes. It may contain bugs or incomplete features.**
+        
+        ## 🚧 Beta Release v${{ steps.version.outputs.PLIST_VERSION }}
+        cat > CHANGELOG.md << EOF
+        # Create changelog
+        
+        fi
+          COMMITS=$(git log --pretty=format:"- %s" $LATEST_PROD_TAG..HEAD)
+          echo "Generating changelog since $LATEST_PROD_TAG"
+        else
+          COMMITS=$(git log --pretty=format:"- %s" | head -20)
+          echo "No production release found, including recent commits"
+        if [ -z "$LATEST_PROD_TAG" ]; then
+        LATEST_PROD_TAG=$(git tag -l "v*" | grep -v beta | sort -V | tail -1)
+        # Get commits since last production release
+      run: |
+      id: changelog
+    - name: Generate changelog
+        
+        ./build.sh
+        chmod +x build.sh
+      run: |
+    - name: Build workflow
+        
+        echo "✅ Beta version ${PLIST_VERSION} ready for release"
+        
+        echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_OUTPUT
+        RELEASE_TAG="v${PLIST_VERSION}-beta-${TIMESTAMP}"
+        TIMESTAMP=$(date +%Y%m%d%H%M%S)
+        # Generate beta release tag with timestamp
+        
+        echo "PLIST_VERSION=$PLIST_VERSION" >> $GITHUB_OUTPUT
+        PLIST_VERSION=$(plutil -extract version raw info.plist)
+        # Get version from info.plist
+      run: |
+      id: version
+    - name: Get version info
+
+        python-version: '3.9'
+      with:
+      uses: actions/setup-python@v4
+    - name: Setup Python
+
+      uses: actions/checkout@v4
+    - name: Checkout repository
+    steps:
+
+    runs-on: macos-latest
+    needs: build
+  release:
+
+        retention-days: 7
+        path: VLX.alfredworkflow
+        name: VLX-v${{ steps.version.outputs.VERSION }}-beta.alfredworkflow
+      with:
+      uses: actions/upload-artifact@v4
+    - name: Upload workflow artifact
+        
+        echo "✅ Workflow built successfully"
+        unzip -t VLX.alfredworkflow
+        test -f VLX.alfredworkflow || exit 1
+      run: |
+    - name: Verify build
+        
+        ./build.sh
+        chmod +x build.sh
+      run: |
+    - name: Build workflow
+
+        echo "Workflow version: $VERSION"
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        VERSION=$(plutil -extract version raw info.plist)
+      run: |
+      id: version
+    - name: Get version from info.plist
+
+        python-version: '3.9'
+      with:
+      uses: actions/setup-python@v4
+    - name: Setup Python
+
+      uses: actions/checkout@v4
+    - name: Checkout repository
+    steps:
+
+    runs-on: macos-latest
+  build:
+jobs:
+
+  contents: write
+permissions:
+
+    branches: [ beta ]
+  push:
+on:
+

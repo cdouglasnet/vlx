@@ -1,0 +1,135 @@
+name: Production Release
+
+on:
+  push:
+    branches: [ master, main ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Get version from info.plist
+      id: version
+      run: |
+        VERSION=$(plutil -extract version raw info.plist)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Workflow version: $VERSION"
+        
+    - name: Build workflow
+      run: |
+        chmod +x build.sh
+        ./build.sh
+        
+    - name: Verify build
+      run: |
+        test -f VLX.alfredworkflow || exit 1
+        unzip -t VLX.alfredworkflow
+        echo "✅ Workflow built successfully"
+        
+    - name: Upload workflow artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VLX-v${{ steps.version.outputs.VERSION }}.alfredworkflow
+        path: VLX.alfredworkflow
+        retention-days: 30
+        
+  release:
+    needs: build
+    runs-on: macos-latest
+    # Only run on push to main/master, not on PRs
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Get version info
+      id: version
+      run: |
+        # Get version from info.plist
+        PLIST_VERSION=$(plutil -extract version raw info.plist)
+        echo "PLIST_VERSION=$PLIST_VERSION" >> $GITHUB_OUTPUT
+        
+        # Generate release tag
+        RELEASE_TAG="v${PLIST_VERSION}"
+        echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_OUTPUT
+        
+        # Check if this version was already released
+        if git fetch origin "refs/tags/${RELEASE_TAG}" 2>/dev/null; then
+          echo "⚠️  Version ${PLIST_VERSION} was already released"
+          echo "already_released=true" >> $GITHUB_OUTPUT
+        else
+          echo "✅ New version ${PLIST_VERSION} ready for release"
+          echo "already_released=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Build workflow
+      run: |
+        chmod +x build.sh
+        ./build.sh
+        
+    - name: Skip if already released
+      if: steps.version.outputs.already_released == 'true'
+      run: |
+        echo "Skipping release - version ${{ steps.version.outputs.PLIST_VERSION }} was already released"
+        exit 0
+        
+    - name: Generate changelog
+      id: changelog
+      if: steps.version.outputs.already_released != 'true'
+      run: |
+        # Get commits since last tag
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        if [ -z "$PREVIOUS_TAG" ]; then
+          echo "No previous tag found, including recent commits"
+          COMMITS=$(git log --pretty=format:"- %s" | head -20)
+        else
+          echo "Generating changelog since $PREVIOUS_TAG"
+          COMMITS=$(git log --pretty=format:"- %s" $PREVIOUS_TAG..HEAD)
+        fi
+        
+        # Create changelog
+        cat > CHANGELOG.md << EOF
+        ## Release v${{ steps.version.outputs.PLIST_VERSION }}
+        
+        ### What's New
+        $COMMITS
+        
+        [View all changes](https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG..HEAD)
+        EOF
+        
+        CHANGELOG=$(cat CHANGELOG.md)
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      if: steps.version.outputs.already_released != 'true'
+      with:
+        tag_name: ${{ steps.version.outputs.RELEASE_TAG }}
+        name: Release ${{ steps.version.outputs.RELEASE_TAG }}
+        body: ${{ steps.changelog.outputs.changelog }}
+        files: VLX.alfredworkflow
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
