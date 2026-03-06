@@ -7,6 +7,7 @@ __pycache__/
 *.svg
 *.tmp
 *.dist-info
+*.build_output
 _backup/*
 setup.py
 automatedTests.py
