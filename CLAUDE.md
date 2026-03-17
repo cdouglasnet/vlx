@@ -13,21 +13,30 @@ This is an Alfred workflow for Visualogyx (VLX) integration, allowing users to q
 ### Main Entry Points
 - `inspections.py` - Script Filter that searches VLX inspections via the API (`vlx` command)
 - `get_report.py` - Run Script that generates and retrieves inspection report URLs
+- `config.py` - Configuration management interface (`vlx:config` command)
+- `configStore.py` - Stores configuration values in macOS Keychain or workflow settings
+
+### Core Dependencies
+- `workflow/` - Alfred-Workflow library for Alfred integration and Keychain support
+  - `workflow.py` - Main Workflow class with password/keychain methods
+  - `web.py` - HTTP utilities
+  - `util.py` - Utility functions (LockFile, atomic_writer, etc.)
 
 ### Core Features
-- **Zero Dependencies**: Uses only Python 3 standard library (`urllib`, `json`, `os`, `sys`)
-- **Secure Configuration**: API keys stored in Alfred workflow environment variables
+- **Secure API Key Storage**: API keys stored in macOS Keychain (not environment variables)
+- **Zero External Dependencies**: Uses only Python 3 standard library (`urllib`, `json`, `os`, `sys`)
 - **Menu Navigation**: List Filter provides inspection action menu
 - **Report Generation**: Direct integration with VLX report API
 
 ### Configuration Storage
-- API keys stored in Alfred workflow environment variables (accessed via `os.environ`)
-- Environment variable `API_KEY` contains the VLX access token
-- Other settings: `key`, `actionPrefix`, `goBack`, `host`, `api_ref`, `team`, `team_id`
+- **API keys stored in macOS Keychain** for security using `wf.save_password('vlxAPI', key)`
+- **Fallback to environment variables** (`API_KEY`) for backwards compatibility
+- Other settings stored in Alfred workflow settings via `wf.settings`
+- Configuration accessed via `vlx:config` command
 
 ### Security Requirements
 - **NEVER hardcode API keys or credentials in source code**
-- **ALWAYS use environment variables** via `os.environ.get()`
+- **ALWAYS store API keys in macOS Keychain** using `wf.save_password()`
 - **ALWAYS mask sensitive data when displaying in UI** (show only partial values)
 - **This is redistributable software** - assume all code will be public
 
@@ -37,10 +46,23 @@ This is an Alfred workflow for Visualogyx (VLX) integration, allowing users to q
 To test the workflow:
 1. Build with `./build.sh` to create `VLX.alfredworkflow`
 2. Install in Alfred by double-clicking the `.alfredworkflow` file
-3. Configure via Alfred Preferences → Workflows → VLX Fast Access
-4. Set your `API_KEY` in the workflow environment variables
-5. Test search with `vlx <search term>`
-6. Test report generation by selecting an inspection and choosing "Report"
+3. Configure API key using `vlx:config` command (stores securely in Keychain)
+4. Test search with `vlx <search term>`
+5. Test report generation by selecting an inspection and choosing "Report"
+
+### API Key Configuration
+The API key is stored securely in macOS Keychain:
+```python
+from workflow import Workflow, PasswordNotFound
+
+wf = Workflow()
+# Save API key
+wf.save_password('vlxAPI', 'your_api_key')
+# Get API key
+api_key = wf.get_password('vlxAPI')
+# Delete API key
+wf.delete_password('vlxAPI')
+```
 
 ### Local Testing (Development)
 For testing scripts locally without Alfred:
@@ -101,8 +123,9 @@ This project intentionally uses NO external dependencies:
 
 #### 1. Missing API Key Error
 - **Issue**: Workflow shows "API Key not configured"
-- **Fix**: Set `API_KEY` in Alfred Preferences → Workflows → VLX Fast Access → Environment Variables
-- **Why**: Environment variables must be configured in Alfred's UI
+- **Fix**: Use `vlx:config` to set your API key (stored securely in Keychain)
+- **Alternative**: Set `API_KEY` environment variable for backwards compatibility
+- **Why**: API keys are now stored in macOS Keychain for security
 
 #### 2. Empty Results or API Errors
 - **Issue**: "No inspections found" or HTTP 401/403 errors
@@ -225,6 +248,8 @@ Before committing changes:
 vlx/
 ├── inspections.py        # Script Filter: Search inspections
 ├── get_report.py         # Run Script: Generate report URL
+├── config.py             # Script Filter: Configuration menu
+├── configStore.py        # Run Script: Store configuration values
 ├── info.plist            # Alfred workflow configuration
 ├── icon.png              # Workflow icon
 ├── LICENSE               # GPL v2.0
@@ -232,6 +257,11 @@ vlx/
 ├── build.sh              # Build script
 ├── .env.example          # Environment template
 ├── .gitignore            # Git ignore patterns
+├── workflow/             # Alfred-Workflow library
+│   ├── __init__.py       # Package exports
+│   ├── workflow.py       # Main Workflow class (Keychain support)
+│   ├── web.py            # HTTP utilities
+│   └── util.py           # Utility functions
 └── List Filter Images/   # Menu icons
     ├── back.png
     ├── email.png
@@ -249,6 +279,23 @@ vlx/
     ├── starred.png
     └── ybang.png
 ```
+
+## Setting Up vlx:config Command in Alfred
+To enable the `vlx:config` command for API key configuration:
+
+1. Open Alfred Preferences → Workflows → VLX Fast Access
+2. Add a new Keyword Input:
+   - Keyword: `vlx:config`
+   - Title: "VLX Configuration"
+   - Argument: Optional (with space)
+3. Add a Script Filter connected to the keyword:
+   - Language: /usr/bin/python3
+   - Script: `python3 config.py "{query}"`
+   - Script Filter should output Alfred JSON
+4. Add a Run Script connected to the Script Filter:
+   - Language: /usr/bin/python3
+   - Script: `python3 configStore.py "{query}"`
+   - This handles saving to Keychain
 
 ## Workflow Flow
 ```

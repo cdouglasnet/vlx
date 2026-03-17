@@ -17,6 +17,12 @@ mkdir -p "$BUILD_DIR"
 # Copy Python files
 cp *.py "$BUILD_DIR/" 2>/dev/null || true
 
+# Copy workflow library (for Keychain support)
+if [ -d "workflow" ]; then
+    rsync -a --exclude='__pycache__' --exclude='*.pyc' workflow/ "$BUILD_DIR/workflow/"
+    echo "  Copied workflow library"
+fi
+
 # Copy images
 cp *.png "$BUILD_DIR/" 2>/dev/null || true
 
@@ -26,17 +32,19 @@ cp README.md "$BUILD_DIR/" 2>/dev/null || true
 # Copy info.plist
 cp info.plist "$BUILD_DIR/"
 
-# Inject about.md content into info.plist (replacing REPLACE_ABOUT_HERE placeholder)
+# Replace version placeholder
+sed -i '' "s|REPLACE_VERSION_HERE|$VERSION|g" "$BUILD_DIR/info.plist"
+echo "  Set version to $VERSION"
+
+# Inject about.md content into info.plist (replacing REPLACE_README_HERE placeholder)
 if [ -f "about.md" ]; then
-    # Read about.md, escape special XML characters, and convert newlines to &#10;
-    ABOUT_CONTENT=$(cat about.md | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' | awk '{printf "%s\\n", $0}' | sed 's/\\n$//')
+    # Read about.md and escape special XML characters
+    ABOUT_CONTENT=$(cat about.md | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' | tr '\n' '\r' | sed 's/\r/\\n/g' | sed 's/\\n$//')
     # Replace the placeholder in info.plist
-    sed -i '' "s|REPLACE_ABOUT_HERE|$ABOUT_CONTENT|g" "$BUILD_DIR/info.plist"
+    sed -i '' "s|REPLACE_README_HERE|$ABOUT_CONTENT|g" "$BUILD_DIR/info.plist"
     echo "  Injected about.md content into info.plist"
 fi
 
-# Update version in info.plist on line 841 (the <string> after <key>version</key>)
-sed -i '' '841s/<string>.*<\/string>/<string>'"$VERSION"'<\/string>/' "$BUILD_DIR/info.plist"
 
 # Copy List Filter Images directory
 rsync -a --exclude='.DS_Store' "List Filter Images/" "$BUILD_DIR/List Filter Images/" 2>/dev/null || true

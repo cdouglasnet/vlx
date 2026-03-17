@@ -25,12 +25,25 @@ An [Alfred](https://www.alfredapp.com/) workflow for fast access to the [Visualo
 
 ## Configuration
 
+Your API key is stored securely in macOS Keychain (not in plain text).
+
+### Setting Your API Key
+
+1. Type `vlx:config` in Alfred
+2. Select "Set API key"
+3. Enter your VLX API key
+4. Press Enter to save
+
+The API key will be stored in your macOS Keychain under the service name based on the workflow bundle ID.
+
+### Environment Variable (Alternative)
+
+For backwards compatibility, you can also set the `API_KEY` environment variable in the workflow configuration. The workflow checks for this first, then falls back to the Keychain.
+
 | Variable       | Default                          | Description                                      |
 |----------------|----------------------------------|--------------------------------------------------|
-| `API_KEY`      | *(required)*                     | Your VLX API key                                 |
+| `API_KEY`      | *(optional)*                     | Your VLX API key (fallback, less secure)         |
 | `key`          | `vlx`                            | Alfred keyword to trigger the workflow           |
-| `team`         | `Admin`                          | Team name                                        |
-| `team_id`      | `8ea84391-dbb3-4d97-a35b-...`    | Team ID                                          |
 
 Copy `.env.example` to `.env` and fill in your values for local development/testing:
 
