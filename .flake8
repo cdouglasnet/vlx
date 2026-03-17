@@ -1,0 +1,13 @@
+[flake8]
+max-line-length = 120
+max-complexity = 10
+exclude =
+    .git,
+    __pycache__,
+    .build_output,
+    workflow
+ignore =
+    E501,  # line too long (handled by max-line-length)
+    W503,  # line break before binary operator
+    E203   # whitespace before ':'
+

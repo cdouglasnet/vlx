@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify Python syntax
+        run: |
+          python -m py_compile config.py
+          python -m py_compile configStore.py
+          python -m py_compile inspections.py
+          python -m py_compile get_report.py
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Update version in build.sh
+        run: |
+          sed -i '' 's/VERSION=".*"/VERSION="${{ steps.version.outputs.version }}"/' build.sh
+          grep "VERSION=" build.sh
+
+      - name: Build workflow
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Verify build
+        run: |
+          unzip -l VLX.alfredworkflow
+          unzip -p VLX.alfredworkflow info.plist | grep -A1 "<key>version</key>"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: VLX.alfredworkflow
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

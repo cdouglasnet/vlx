@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop, 'feature/**', 'release/**' ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  lint:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install linting tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pylint
+
+      - name: Run flake8
+        run: |
+          flake8 *.py --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 *.py --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+
+      - name: Run pylint
+        run: |
+          pylint *.py --exit-zero --disable=C0114,C0115,C0116,R0903,W0612,W0613
+
+  test:
+    name: Test Python Scripts
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify Python syntax
+        run: |
+          python -m py_compile config.py
+          python -m py_compile configStore.py
+          python -m py_compile inspections.py
+          python -m py_compile get_report.py
+          echo "✓ All Python files have valid syntax"
+
+      - name: Test config.py output format
+        run: |
+          # Test that config.py outputs valid JSON
+          output=$(python config.py "" 2>&1)
+          echo "$output" | python -m json.tool > /dev/null
+          echo "✓ config.py outputs valid JSON"
+
+      - name: Test inspections.py without API key
+        run: |
+          # Test that inspections.py handles missing API key gracefully
+          output=$(python inspections.py "" 2>&1)
+          echo "$output" | python -m json.tool > /dev/null
+          if echo "$output" | grep -q "API Key not configured"; then
+            echo "✓ inspections.py correctly reports missing API key"
+          else
+            echo "✗ inspections.py should report missing API key"
+            exit 1
+          fi
+
+  build:
+    name: Build Workflow
+    runs-on: macos-latest
+    needs: [lint, test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build workflow
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Verify build output
+        run: |
+          if [ -f "VLX.alfredworkflow" ]; then
+            echo "✓ VLX.alfredworkflow created"
+          else
+            echo "✗ VLX.alfredworkflow not found"
+            exit 1
+          fi
+
+      - name: Verify workflow structure
+        run: |
+          unzip -l VLX.alfredworkflow
+          
+          # Check required files exist in the workflow
+          unzip -l VLX.alfredworkflow | grep -q "info.plist" || (echo "✗ Missing info.plist" && exit 1)
+          unzip -l VLX.alfredworkflow | grep -q "inspections.py" || (echo "✗ Missing inspections.py" && exit 1)
+          unzip -l VLX.alfredworkflow | grep -q "config.py" || (echo "✗ Missing config.py" && exit 1)
+          unzip -l VLX.alfredworkflow | grep -q "configStore.py" || (echo "✗ Missing configStore.py" && exit 1)
+          unzip -l VLX.alfredworkflow | grep -q "get_report.py" || (echo "✗ Missing get_report.py" && exit 1)
+          unzip -l VLX.alfredworkflow | grep -q "icon.png" || (echo "✗ Missing icon.png" && exit 1)
+          
+          echo "✓ All required files present in workflow"
+
+      - name: Verify info.plist validity
+        run: |
+          # Extract and validate info.plist
+          unzip -p VLX.alfredworkflow info.plist > /tmp/info.plist
+          plutil -lint /tmp/info.plist
+          echo "✓ info.plist is valid"
+
+      - name: Verify version was injected
+        run: |
+          unzip -p VLX.alfredworkflow info.plist > /tmp/info.plist
+          if grep -q "REPLACE_VERSION_HERE" /tmp/info.plist; then
+            echo "✗ Version placeholder was not replaced"
+            exit 1
+          else
+            echo "✓ Version placeholder was replaced"
+          fi
+
+      - name: Verify readme was injected
+        run: |
+          unzip -p VLX.alfredworkflow info.plist > /tmp/info.plist
+          if grep -q "REPLACE_README_HERE" /tmp/info.plist; then
+            echo "✗ Readme placeholder was not replaced"
+            exit 1
+          else
+            echo "✓ Readme placeholder was replaced"
+          fi
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VLX-workflow
+          path: VLX.alfredworkflow
+          retention-days: 30
+

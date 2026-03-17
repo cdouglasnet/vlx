@@ -7,7 +7,7 @@ __pycache__/
 *.svg
 *.tmp
 *.dist-info
-*.build_output
+.build_output/
 _backup/*
 setup.py
 automatedTests.py
@@ -18,3 +18,6 @@ workflow/.alfredversionchecked
 workflow-build.py
 requirements/
 .DS_Store
+.idea/
+*.iml
+.vscode/

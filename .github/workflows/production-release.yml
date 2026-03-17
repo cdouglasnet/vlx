@@ -16,14 +16,18 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-        
-    - name: Get version from info.plist
+        python-version: '3.11'
+
+    - name: Verify Python syntax
+      run: |
+        python -m py_compile config.py configStore.py inspections.py get_report.py
+
+    - name: Get version from build.sh
       id: version
       run: |
-        VERSION=$(plutil -extract version raw info.plist)
+        VERSION=$(grep 'VERSION=' build.sh | head -1 | sed 's/VERSION="\([^"]*\)"/\1/')
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
         echo "Workflow version: $VERSION"
         
@@ -41,14 +45,13 @@ jobs:
     - name: Upload workflow artifact
       uses: actions/upload-artifact@v4
       with:
-        name: VLX-v${{ steps.version.outputs.VERSION }}.alfredworkflow
+        name: VLX-v${{ steps.version.outputs.VERSION }}
         path: VLX.alfredworkflow
         retention-days: 30
         
   release:
     needs: build
     runs-on: macos-latest
-    # Only run on push to main/master, not on PRs
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     
     steps:
@@ -56,27 +59,24 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-        
+        python-version: '3.11'
+
     - name: Get version info
       id: version
       run: |
-        # Get version from info.plist
-        PLIST_VERSION=$(plutil -extract version raw info.plist)
-        echo "PLIST_VERSION=$PLIST_VERSION" >> $GITHUB_OUTPUT
+        VERSION=$(grep 'VERSION=' build.sh | head -1 | sed 's/VERSION="\([^"]*\)"/\1/')
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
         
-        # Generate release tag
-        RELEASE_TAG="v${PLIST_VERSION}"
+        RELEASE_TAG="v${VERSION}"
         echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_OUTPUT
         
-        # Check if this version was already released
         if git fetch origin "refs/tags/${RELEASE_TAG}" 2>/dev/null; then
-          echo "⚠️  Version ${PLIST_VERSION} was already released"
+          echo "⚠️  Version ${VERSION} was already released"
           echo "already_released=true" >> $GITHUB_OUTPUT
         else
-          echo "✅ New version ${PLIST_VERSION} ready for release"
+          echo "✅ New version ${VERSION} ready for release"
           echo "already_released=false" >> $GITHUB_OUTPUT
         fi
         
@@ -88,14 +88,12 @@ jobs:
     - name: Skip if already released
       if: steps.version.outputs.already_released == 'true'
       run: |
-        echo "Skipping release - version ${{ steps.version.outputs.PLIST_VERSION }} was already released"
-        exit 0
-        
+        echo "Skipping release - version ${{ steps.version.outputs.VERSION }} was already released"
+
     - name: Generate changelog
       id: changelog
       if: steps.version.outputs.already_released != 'true'
       run: |
-        # Get commits since last tag
         PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
         if [ -z "$PREVIOUS_TAG" ]; then
           echo "No previous tag found, including recent commits"
@@ -107,7 +105,7 @@ jobs:
         
         # Create changelog
         cat > CHANGELOG.md << EOF
-        ## Release v${{ steps.version.outputs.PLIST_VERSION }}
+        ## Release v${{ steps.version.outputs.VERSION }}
         
         ### What's New
         $COMMITS
